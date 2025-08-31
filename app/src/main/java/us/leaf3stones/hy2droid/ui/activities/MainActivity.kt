@@ -9,27 +9,39 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import us.leaf3stones.hy2droid.ui.theme.Hy2droidTheme
 
 class MainActivity : ComponentActivity() {
@@ -48,6 +60,10 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainScreen(modifier: Modifier = Modifier, viewModel: MainActivityViewModel = viewModel()) {
+    val focusRequester = remember { FocusRequester() }
+    var isStartFocused by remember { mutableStateOf(false) }
+    var isStopFocused by remember { mutableStateOf(false) }
+
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     val vpnRequestLauncher =
@@ -70,6 +86,57 @@ fun MainScreen(modifier: Modifier = Modifier, viewModel: MainActivityViewModel =
             modifier = Modifier.align(Alignment.Start)
         )
 
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 2.dp),
+            thickness = 1.dp
+        )
+
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Button(
+                modifier = Modifier
+                    .padding(horizontal = 2.dp, vertical = 2.dp)
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { isStartFocused = it.isFocused }
+                    .then(
+                        if (isStartFocused) {
+                            Modifier.border(2.dp, MaterialTheme.colorScheme.inversePrimary, RoundedCornerShape(50.dp))
+                        } else {
+                            Modifier
+                        }
+                    ),
+                onClick = {
+                val prepIntent = VpnService.prepare(context)
+                if (prepIntent != null) {
+                    vpnRequestLauncher.launch(prepIntent)
+                } else {
+                    viewModel.startVpnService(context)
+                }
+            }) {
+                Text(text = "start vpn")
+            }
+
+            Button(
+                modifier = Modifier
+                    .padding(horizontal = 2.dp, vertical = 2.dp)
+                    .onFocusChanged { isStopFocused = it.isFocused }
+                    .then(
+                        if (isStopFocused) {
+                            Modifier.border(2.dp, MaterialTheme.colorScheme.inversePrimary, RoundedCornerShape(50.dp))
+                        } else {
+                            Modifier
+                        }
+                    ),
+                onClick = {
+                    viewModel.stopVpnService(context)
+                }
+            ) {
+                Text(text = "stop vpn")
+            }
+        }
+
         val config = state.configData
         BasicHysteriaConfigEdit(
             serverAddress = config.server,
@@ -83,26 +150,10 @@ fun MainScreen(modifier: Modifier = Modifier, viewModel: MainActivityViewModel =
         )
 
         Text(
-            text = if (state.isVpnConnected) "connected" else "disconnected",
+            text = if (state.isVpnConnected) "connected" else "",
             modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
             style = MaterialTheme.typography.titleMedium
         )
-        if (state.isVpnConnected) {
-            Button(onClick = { viewModel.stopVpnService(context) }) {
-                Text(text = "stop vpn")
-            }
-        } else {
-            Button(onClick = {
-                val prepIntent = VpnService.prepare(context)
-                if (prepIntent != null) {
-                    vpnRequestLauncher.launch(prepIntent)
-                } else {
-                    viewModel.startVpnService(context)
-                }
-            }) {
-                Text(text = "start vpn")
-            }
-        }
 
         if (state.shouldShowConfigInvalidReminder) {
             AlertDialog(
@@ -124,6 +175,11 @@ fun MainScreen(modifier: Modifier = Modifier, viewModel: MainActivityViewModel =
                 })
         }
     }
+
+    LaunchedEffect(Unit) {
+        delay(100)
+        focusRequester.requestFocus()
+    }
 }
 
 @Composable
@@ -137,6 +193,8 @@ fun BasicHysteriaConfigEdit(
     onConfigConfirmed: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isSaveFocused by remember { mutableStateOf(false) }
+
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         OutlinedTextField(
             value = serverAddress,
@@ -165,7 +223,16 @@ fun BasicHysteriaConfigEdit(
         )
         Button(
             onClick = onConfigConfirmed,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .onFocusChanged { isSaveFocused = it.isFocused }
+                .then(
+                    if (isSaveFocused) {
+                        Modifier.border(2.dp, MaterialTheme.colorScheme.inversePrimary, RoundedCornerShape(50.dp))
+                    } else {
+                        Modifier
+                    }
+                ),
         ) {
             Text(text = "save")
         }
