@@ -16,7 +16,7 @@ import us.leaf3stones.hy2droid.data.model.HysteriaConfig
 import us.leaf3stones.hy2droid.proxy.Hysteria2VpnService
 
 class MainActivityViewModel : ViewModel() {
-    private val _state = MutableStateFlow(UiState(false, HysteriaConfig(), false))
+    private val _state = MutableStateFlow(UiState(HysteriaConfig(), false))
     val state get() = _state.asStateFlow()
 
     private val configRepo = HysteriaConfigRepository()
@@ -31,21 +31,6 @@ class MainActivityViewModel : ViewModel() {
     }
 
     fun startVpnService(context: Context) {
-        val vpnStatusObserver = object : Hysteria2VpnService.Companion.VpnStatusObserver {
-            override fun onVpnStarted() {
-                _state.update { curr ->
-                    curr.copy(isVpnConnected = true)
-                }
-            }
-
-            override fun onVpnStopped() {
-                _state.update { curr ->
-                    curr.copy(isVpnConnected = false)
-                }
-            }
-        }
-        Hysteria2VpnService.addObserver(vpnStatusObserver)
-
         Intent(context, Hysteria2VpnService::class.java).apply {
             setAction(Hysteria2VpnService.ACTION_START_VPN)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -108,7 +93,6 @@ class MainActivityViewModel : ViewModel() {
 }
 
 data class UiState(
-    val isVpnConnected: Boolean,
     val configData: HysteriaConfig,
     val shouldShowConfigInvalidReminder: Boolean
 )

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import us.leaf3stones.hy2droid.data.VpnServiceState
 import us.leaf3stones.hy2droid.ui.theme.Hy2droidTheme
 
 class MainActivity : ComponentActivity() {
@@ -65,6 +66,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModel: MainActivityViewModel =
     var isStopFocused by remember { mutableStateOf(false) }
 
     val state by viewModel.state.collectAsState()
+    val vpnState by VpnServiceState.state.collectAsState(initial = "disconnected")
     val context = LocalContext.current
     val vpnRequestLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
@@ -108,13 +110,14 @@ fun MainScreen(modifier: Modifier = Modifier, viewModel: MainActivityViewModel =
                         }
                     ),
                 onClick = {
-                val prepIntent = VpnService.prepare(context)
-                if (prepIntent != null) {
-                    vpnRequestLauncher.launch(prepIntent)
-                } else {
-                    viewModel.startVpnService(context)
+                    val prepIntent = VpnService.prepare(context)
+                    if (prepIntent != null) {
+                        vpnRequestLauncher.launch(prepIntent)
+                    } else {
+                        viewModel.startVpnService(context)
+                    }
                 }
-            }) {
+            ) {
                 Text(text = "start vpn")
             }
 
@@ -150,7 +153,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModel: MainActivityViewModel =
         )
 
         Text(
-            text = if (state.isVpnConnected) "connected" else "",
+            text = vpnState,
             modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
             style = MaterialTheme.typography.titleMedium
         )

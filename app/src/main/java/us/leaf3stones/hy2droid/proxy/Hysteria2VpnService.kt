@@ -19,6 +19,7 @@ import us.leaf3stones.hy2droid.R
 import us.leaf3stones.hy2droid.data.KEY_IS_VPN_CONFIG_READY
 import us.leaf3stones.hy2droid.data.KEY_VPN_CONFIG_PATH
 import us.leaf3stones.hy2droid.data.TUN2SOCKS_CONFIG_FILE_NAME
+import us.leaf3stones.hy2droid.data.VpnServiceState
 import us.leaf3stones.hy2droid.data.vpnPrefDataStore
 import java.io.File
 import java.util.Scanner
@@ -35,6 +36,10 @@ class Hysteria2VpnService : VpnService() {
 
     private val job = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.Main + job)
+
+    private fun updateState(state: String) {
+        scope.launch { VpnServiceState.update(state) }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val isStart = intent?.action == ACTION_START_VPN
@@ -105,10 +110,7 @@ class Hysteria2VpnService : VpnService() {
         val fd = establishSystemVpnTunnel()
         startTun2socks(File(filesDir, TUN2SOCKS_CONFIG_FILE_NAME).absolutePath, fd)
         Log.d(TAG, getTun2socksStats().contentToString())
-
-        observers.forEach {
-            it.onVpnStarted()
-        }
+        updateState("connected")
     }
 
     private fun startHysteriaInternal(hysteriaConfig: String) {
@@ -140,10 +142,7 @@ class Hysteria2VpnService : VpnService() {
 
     private fun cleanup() {
         try {
-            observers.forEach {
-                it.onVpnStopped()
-            }
-            observers.clear()
+            updateState("disconnected")
             stopTun2socks()
             netFileDescriptor?.close()
             netFileDescriptor = null
@@ -176,23 +175,7 @@ class Hysteria2VpnService : VpnService() {
         const val ACTION_STOP_VPN =
             "us.leaf3stones.hy2droid.proxy.Hysteria2VpnService.ACTION_STOP_VPN"
 
-        interface VpnStatusObserver {
-            fun onVpnStarted()
-            fun onVpnStopped()
-        }
-
-        fun addObserver(observer: VpnStatusObserver) {
-            observers.add(observer)
-        }
-
-        fun removeObserver(observer: VpnStatusObserver) {
-            if (!observers.remove(observer)) {
-                Log.w(TAG, "trying to remove a non-exist observer $observer")
-            }
-        }
-
         private val TAG = Hysteria2VpnService::class.java.simpleName.toString()
         private const val HYSTERIA_TAG = "hysteria"
-        private val observers: MutableSet<VpnStatusObserver> = mutableSetOf()
     }
 }
